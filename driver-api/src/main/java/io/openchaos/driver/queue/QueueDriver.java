@@ -16,6 +16,8 @@ package io.openchaos.driver.queue;
 
 import io.openchaos.driver.ChaosDriver;
 
+import java.util.List;
+
 public interface QueueDriver extends ChaosDriver {
 
     /**
@@ -39,5 +41,22 @@ public interface QueueDriver extends ChaosDriver {
      * Create a PullConsumer. Note: if driver use push consumer, you can choose not to implement this method
      */
     QueuePullConsumer createPullConsumer(String topic, String subscriptionName);
+
+
+    /**
+     * Use specified topic or create new topic
+     * @return
+     */
+    default boolean useMyTopic(){
+        return false;
+    }
+
+    /**
+     * If use specified topic, read topic name from here
+     * @return
+     */
+    default String myTopic(){
+        return null;
+    }
 
 }

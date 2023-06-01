@@ -173,14 +173,20 @@ public class QueueModel implements Model {
                 pubSubDriver = createChaosDriver(driverConfigFile);
             }
 
-            log.info("Create chaos topic : {}", chaosTopic);
-            pubSubDriver.createTopic(chaosTopic, 8);
+            String newTopicName = chaosTopic;
+            if(pubSubDriver.useMyTopic()){
+                newTopicName = pubSubDriver.myTopic();
+                log.info("Reuse existed chaos topic : {}", newTopicName);
+            } else {
+                log.info("Create chaos topic : {}", chaosTopic);
+                pubSubDriver.createTopic(chaosTopic, 8);
+            }
 
             log.info("Clients setup..");
 
             List<List<String>> shardingKeyLists = Utils.partitionList(shardingKeys, concurrency);
             for (int i = 0; i < concurrency; i++) {
-                Client client = new QueueClient(pubSubDriver, chaosTopic, recorder, isOrderTest, isUsePull, shardingKeyLists.get(i), msgReceivedCount);
+                Client client = new QueueClient(pubSubDriver, newTopicName, recorder, isOrderTest, isUsePull, shardingKeyLists.get(i), msgReceivedCount);
                 client.setup();
                 clients.add(client);
                 ClientWorker clientWorker = new ClientWorker("queueClient-" + i, client, rateLimiter, log);

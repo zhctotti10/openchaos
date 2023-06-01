@@ -17,4 +17,10 @@ package io.openchaos.driver.rocketmq.config;
 public class RocketMQClientConfig {
     public String namesrvAddr;
     public String clusterName;
+    public String topicName;
+    public boolean useMyTopic;
+    public boolean useCustomNamespace;
+    public String customNamespace;
+    public String accessKey;
+    public String secretKey;
 }

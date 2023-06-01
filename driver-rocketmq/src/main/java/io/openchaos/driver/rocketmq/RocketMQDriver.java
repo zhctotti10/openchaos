@@ -17,6 +17,7 @@ package io.openchaos.driver.rocketmq;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.base.Splitter;
 import com.google.common.io.BaseEncoding;
 import io.openchaos.common.Message;
 import io.openchaos.driver.MetaNode;
@@ -34,14 +35,20 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.rocketmq.acl.common.AclClientRPCHook;
+import org.apache.rocketmq.acl.common.SessionCredentials;
 import org.apache.rocketmq.client.consumer.DefaultLitePullConsumer;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
 import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
+import org.apache.rocketmq.client.consumer.rebalance.AllocateMessageQueueAveragely;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
 import org.apache.rocketmq.common.TopicConfig;
 import org.apache.rocketmq.common.message.MessageExt;
+import org.apache.rocketmq.remoting.RPCHook;
 import org.apache.rocketmq.tools.admin.DefaultMQAdminExt;
 import org.apache.rocketmq.tools.command.CommandUtil;
 import org.slf4j.Logger;
@@ -60,6 +67,7 @@ public class RocketMQDriver implements QueueDriver {
     private String nameServerPort = "9876";
     private List<String> nodes;
     private List<String> metaNodes;
+    private RPCHook rpcHook;
 
     private static RocketMQClientConfig readConfigForClient(File configurationFile) throws IOException {
         return MAPPER.readValue(configurationFile, RocketMQClientConfig.class);
@@ -79,14 +87,31 @@ public class RocketMQDriver implements QueueDriver {
         return BaseEncoding.base64Url().omitPadding().encode(buffer);
     }
 
+    public boolean isAclEnabled() {
+        return !(StringUtils.isAnyBlank(this.rmqClientConfig.accessKey, this.rmqClientConfig.secretKey) ||
+                StringUtils.isAnyEmpty(this.rmqClientConfig.accessKey, this.rmqClientConfig.secretKey));
+    }
+
     @Override
     public void initialize(File configurationFile, List<String> nodes) throws IOException {
         this.rmqClientConfig = readConfigForClient(configurationFile);
         this.rmqBrokerConfig = readConfigForBroker(configurationFile);
         this.rmqConfig = readConfigForRMQ(configurationFile);
+        if (isAclEnabled()) {
+            rpcHook = new AclClientRPCHook(new SessionCredentials(this.rmqClientConfig.accessKey, this.rmqClientConfig.secretKey));
+            this.rmqAdmin = new DefaultMQAdminExt(rpcHook);
+        } else {
+            this.rmqAdmin = new DefaultMQAdminExt();
+        }
         this.nodes = nodes;
         if (rmqConfig.nameServerPort != null && !rmqConfig.nameServerPort.isEmpty()) {
             this.nameServerPort = rmqConfig.nameServerPort;
+        }
+
+        try {
+            this.rmqAdmin.start();
+        } catch (MQClientException e) {
+            log.error("Start the RocketMQ admin tool failed.");
         }
     }
 
@@ -98,7 +123,13 @@ public class RocketMQDriver implements QueueDriver {
 
     @Override
     public QueueProducer createProducer(String topic) {
-        DefaultMQProducer defaultMQProducer = new DefaultMQProducer("ProducerGroup_Chaos");
+        DefaultMQProducer defaultMQProducer;
+        if (isAclEnabled()) {
+            defaultMQProducer = new DefaultMQProducer("ProducerGroup_Chaos" + getRandomString(), rpcHook);
+        } else {
+            defaultMQProducer = new DefaultMQProducer("ProducerGroup_Chaos" + getRandomString());
+        }
+
         defaultMQProducer.setNamesrvAddr(getNameserver());
         defaultMQProducer.setInstanceName("ProducerInstance" + getRandomString());
 
@@ -108,14 +139,34 @@ public class RocketMQDriver implements QueueDriver {
     @Override
     public QueuePushConsumer createPushConsumer(String topic, String subscriptionName,
         ConsumerCallback consumerCallback) {
-        DefaultMQPushConsumer defaultMQPushConsumer = new DefaultMQPushConsumer(subscriptionName);
+
+        // To avoid bench-tool encounter subscription relationship conflict when specifying multiple topics, let's add topic name as subscription name prefix.
+        String subPrefix;
+        if(topic.contains("%")){
+            subPrefix = topic.split("%")[1];
+        } else {
+            subPrefix = topic;
+        }
+        String fullSubName = String.format("%s_%s",subPrefix, subscriptionName);
+
+        DefaultMQPushConsumer defaultMQPushConsumer;
+        if (isAclEnabled()) {
+            defaultMQPushConsumer = new DefaultMQPushConsumer(fullSubName, rpcHook, new AllocateMessageQueueAveragely());
+        } else {
+            defaultMQPushConsumer = new DefaultMQPushConsumer(fullSubName);
+        }
+
         defaultMQPushConsumer.setNamesrvAddr(getNameserver());
+
+        if(rmqClientConfig.useCustomNamespace){
+            defaultMQPushConsumer.setNamespace(rmqClientConfig.customNamespace);
+        }
         defaultMQPushConsumer.setInstanceName("ConsumerInstance" + getRandomString());
         try {
             defaultMQPushConsumer.subscribe(topic, "*");
             defaultMQPushConsumer.registerMessageListener((MessageListenerConcurrently) (msgs, context) -> {
                 for (MessageExt message : msgs) {
-                    consumerCallback.messageReceived(new Message(message.getKeys(), message.getBody(), message.getBornTimestamp(), System.currentTimeMillis(), buildExtraInfo(message, subscriptionName)));
+                    consumerCallback.messageReceived(new Message(message.getKeys(), message.getBody(), message.getBornTimestamp(), System.currentTimeMillis(), buildExtraInfo(message, fullSubName)));
                 }
                 return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
             });
@@ -152,15 +203,15 @@ public class RocketMQDriver implements QueueDriver {
 
     @Override
     public void createTopic(String topic, int partitions) {
-
-        this.rmqAdmin = new DefaultMQAdminExt();
-        this.rmqAdmin.setNamesrvAddr(getNameserver());
-        this.rmqAdmin.setInstanceName("AdminInstance-" + getRandomString());
-        try {
-            this.rmqAdmin.start();
-        } catch (MQClientException e) {
-            log.error("Start the RocketMQ admin tool failed.");
-        }
+//
+//        this.rmqAdmin = new DefaultMQAdminExt();
+//        this.rmqAdmin.setNamesrvAddr(getNameserver());
+//        this.rmqAdmin.setInstanceName("AdminInstance-" + getRandomString());
+//        try {
+//            this.rmqAdmin.start();
+//        } catch (MQClientException e) {
+//            log.error("Start the RocketMQ admin tool failed.");
+//        }
 
         TopicConfig topicConfig = new TopicConfig();
         topicConfig.setOrder(false);
@@ -194,11 +245,21 @@ public class RocketMQDriver implements QueueDriver {
     @Override
     public String getStateName() {
         return "io.openchaos.driver.rocketmq.RocketMQChaosState";
-    }    
+    }
+
+    @Override
+    public boolean useMyTopic() {
+        return rmqClientConfig.useMyTopic;
+    }
+
+    @Override
+    public String myTopic() {
+        return rmqClientConfig.topicName;
+    }
     
     private String getNameserver() {
-        if (rmqBrokerConfig.namesrvAddr != null && !rmqBrokerConfig.namesrvAddr.isEmpty()) {
-            return rmqBrokerConfig.namesrvAddr;
+        if (rmqClientConfig.namesrvAddr != null && !rmqClientConfig.namesrvAddr.isEmpty()) {
+            return rmqClientConfig.namesrvAddr;
         } else if (metaNodes != null) {
             StringBuilder res = new StringBuilder();
             metaNodes.forEach(node -> res.append(node + ":" + nameServerPort + ";"));
