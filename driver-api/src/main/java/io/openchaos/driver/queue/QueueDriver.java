@@ -59,4 +59,12 @@ public interface QueueDriver extends ChaosDriver {
         return null;
     }
 
+    /**
+     * Specify subscriptionName
+     * @return
+     */
+    default String subscriptionName(){
+        return "ChaosTest_ConsumerGroup";
+    }
+
 }

@@ -137,6 +137,17 @@ public class RocketMQDriver implements QueueDriver {
     }
 
     @Override
+    public String subscriptionName(){
+        if(rmqClientConfig.customSubscriptionName == null || rmqClientConfig.customSubscriptionName.isEmpty()){
+            // use default subName
+            return "ChaosTest_ConsumerGroup";
+        } else {
+            // use specified subName
+            return rmqClientConfig.customSubscriptionName;
+        }
+    }
+
+    @Override
     public QueuePushConsumer createPushConsumer(String topic, String subscriptionName,
         ConsumerCallback consumerCallback) {
 

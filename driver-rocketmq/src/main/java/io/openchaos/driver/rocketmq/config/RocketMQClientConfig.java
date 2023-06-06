@@ -21,6 +21,7 @@ public class RocketMQClientConfig {
     public boolean useMyTopic;
     public boolean useCustomNamespace;
     public String customNamespace;
+    public String customSubscriptionName;
     public String accessKey;
     public String secretKey;
 }

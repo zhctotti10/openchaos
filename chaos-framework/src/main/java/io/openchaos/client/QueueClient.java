@@ -67,10 +67,10 @@ public class QueueClient implements Client, ConsumerCallback {
         producer = pubSubDriver.createProducer(chaosTopic);
         producer.start();
         if (isUsePull) {
-            pullConsumer = pubSubDriver.createPullConsumer(chaosTopic, SUBSCRIPTION_NAME);
+            pullConsumer = pubSubDriver.createPullConsumer(chaosTopic, pubSubDriver.subscriptionName());
             pullConsumer.start();
         } else {
-            pushConsumer = pubSubDriver.createPushConsumer(chaosTopic, SUBSCRIPTION_NAME, this);
+            pushConsumer = pubSubDriver.createPushConsumer(chaosTopic, pubSubDriver.subscriptionName(), this);
             pushConsumer.start();
         }
     }
