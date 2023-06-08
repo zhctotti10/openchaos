@@ -67,7 +67,8 @@ public class CMQChaosProducer implements QueueProducer {
                 log.warn("Enqueue fail", e);
                 return InvokeResult.FAILURE;
             }
-            return InvokeResult.SUCCESS.setExtraInfoAndReturnSelf(cmqResponse.getMsgId());
+            String extraInfo = String.format("msgId:%s, reqId:%s", cmqResponse.getMsgId(), cmqResponse.getRequestId());
+            return InvokeResult.SUCCESS.setExtraInfoAndReturnSelf(extraInfo);
         } else {
             String msgId="";
 

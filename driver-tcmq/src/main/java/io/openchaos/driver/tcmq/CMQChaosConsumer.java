@@ -54,20 +54,31 @@ public class CMQChaosConsumer implements QueuePullConsumer {
 
         if (!messages.isEmpty()) {
             ArrayList<String> vtReceiptHandle = new ArrayList<String>();
+            List<Message> collectList =  new ArrayList<>();
             for(com.qcloud.cmq.Message message: messages){
                 vtReceiptHandle.add(message.receiptHandle);
+                Message tmpMsg = new Message(message.msgId, message.msgBody.getBytes(),
+                        message.enqueueTime, System.currentTimeMillis(), buildConsumeMessageInfo(message));
+                collectList.add(tmpMsg);
             }
 
             try {
                 queue.batchDeleteMessage(vtReceiptHandle);
-                return messages.stream().map(message -> new Message(message.msgId, message.msgBody.getBytes(),
-                        message.enqueueTime, System.currentTimeMillis(), message.receiptHandle)).collect(Collectors.toList());
+                return collectList;
             } catch (Exception e) {
+                log.warn("error happened in ack: ", e);
                 return null;
             }
         } else {
             return null;
         }
+    }
+
+    public String buildConsumeMessageInfo(com.qcloud.cmq.Message message){
+        String msg_info = "";
+        msg_info = String.format("msgId:%s, msgBody:%s, requestId:%s, handle:%s", message.msgId, message.msgBody, message.requestId, message.receiptHandle);
+
+        return msg_info;
     }
 
     @Override public void start() {
