@@ -79,7 +79,7 @@ public class CMQDriver implements QueueDriver {
     public QueuePullConsumer createPullConsumer(String topic, String subscriptionName) {
         Account account = new Account(rmqClientConfig.serviceURL, rmqClientConfig.secretId, rmqClientConfig.secretKey);
 
-        return new CMQChaosConsumer(account, rmqClientConfig.queueName, rmqClientConfig.waitSeconds);
+        return new CMQChaosConsumer(account, rmqClientConfig.queueName, rmqClientConfig.waitSeconds, rmqClientConfig.ackDelayInMs);
     }
 
     @Override

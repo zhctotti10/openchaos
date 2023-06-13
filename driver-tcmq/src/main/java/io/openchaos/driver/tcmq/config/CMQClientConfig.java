@@ -20,6 +20,7 @@ public class CMQClientConfig {
     public String topicName;
     public String resourceType="queue";
     public int delaySeconds;
+    public int ackDelayInMs = 0;
     public int waitSeconds = 2;
     public String subscriptionType = "tag";
     public String routingKey;

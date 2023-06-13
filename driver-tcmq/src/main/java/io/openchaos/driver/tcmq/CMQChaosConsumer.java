@@ -12,18 +12,16 @@ package io.openchaos.driver.tcmq;/*
  * limitations under the License.
  */
 
-import com.google.common.collect.Lists;
+
 import com.qcloud.cmq.Account;
 import com.qcloud.cmq.Queue;
-import com.qcloud.cmq.Topic;
 import io.openchaos.common.Message;
 import io.openchaos.driver.queue.QueuePullConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
 
 public class CMQChaosConsumer implements QueuePullConsumer {
 
@@ -32,11 +30,13 @@ public class CMQChaosConsumer implements QueuePullConsumer {
     Account account;
     private String chaosTopic;
     private int waitSec=2;
+    private int ackDelayInMs=0;
 
-    public CMQChaosConsumer(Account account, String chaosTopic, int waitSec) {
+    public CMQChaosConsumer(Account account, String chaosTopic, int waitSec, int ackDelayInMs) {
         this.chaosTopic = chaosTopic;
         this.account = account;
         this.waitSec = waitSec;
+        this.ackDelayInMs = ackDelayInMs;
     }
 
     @Override public List<Message> dequeue() {
@@ -63,6 +63,10 @@ public class CMQChaosConsumer implements QueuePullConsumer {
             }
 
             try {
+                if(ackDelayInMs>0){
+                    TimeUnit.MILLISECONDS.sleep(ackDelayInMs);
+                }
+
                 queue.batchDeleteMessage(vtReceiptHandle);
                 return collectList;
             } catch (Exception e) {
