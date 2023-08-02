@@ -37,7 +37,7 @@ public class FaultGenerator {
             "major-cpu-high", "random-cpu-high", "fixed-cpu-high", "minor-mem-high", "major-mem-high",
             "random-mem-high", "fixed-mem-high", "minor-disk-error", "major-disk-error",
             "random-disk-error", "fixed-disk-error", "minor-io-hang", "major-io-hang",
-            "random-io-hang", "fixed-io-hang");
+            "random-io-hang", "fixed-io-hang", "custom-fault");
     private static Random random = new Random();
     private static ChaosState chaosState;
 

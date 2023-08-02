@@ -23,17 +23,23 @@ public class FaultWorker extends Worker {
     private Fault fault;
 
     private int interval;
+    private boolean fault_once;
 
-    public FaultWorker(Logger log, Fault fault, int interval) {
-        super("Fault worker", log);
+    public FaultWorker(Logger log, Fault fault, int interval, boolean fault_once) {
+        super("Fault worker", log, fault_once);
         this.fault = fault;
         this.interval = interval;
+        this.fault_once = fault_once;
     }
 
     @Override
     public void loop() {
         try {
-            await(TimeUnit.SECONDS.toMillis(interval));
+            if(fault_once){
+                await(TimeUnit.SECONDS.toMillis(15));
+            } else {
+                await(TimeUnit.SECONDS.toMillis(interval));
+            }
             fault.invoke();
             await(TimeUnit.SECONDS.toMillis(interval));
             fault.recover();

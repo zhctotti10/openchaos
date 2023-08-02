@@ -23,6 +23,7 @@ import io.openchaos.checker.KVChecker;
 import io.openchaos.checker.QueueChecker;
 import io.openchaos.checker.PerfChecker;
 import io.openchaos.checker.result.TestResult;
+import io.openchaos.fault.*;
 import io.openchaos.http.Agent;
 import io.openchaos.checker.Checker;
 import io.openchaos.checker.EndToEndLatencyChecker;
@@ -31,11 +32,6 @@ import io.openchaos.checker.RTOChecker;
 import io.openchaos.checker.RecoveryChecker;
 import io.openchaos.common.utils.SshUtil;
 import io.openchaos.driver.ChaosNode;
-import io.openchaos.fault.Fault;
-import io.openchaos.fault.KillFault;
-import io.openchaos.fault.NetFault;
-import io.openchaos.fault.NoopFault;
-import io.openchaos.fault.PauseFault;
 import io.openchaos.model.KVModel;
 import io.openchaos.model.Model;
 import io.openchaos.model.QueueModel;
@@ -301,8 +297,12 @@ public class ChaosControl {
 
             //Initial fault
             if (map == null || map.isEmpty()) {
-                log.warn("Configure file does not contain nodes, use noop fault");
-                fault = new NoopFault();
+                if(arguments.fault.equalsIgnoreCase("custom-fault")){
+                    fault = new CustomFault(recorder);
+                } else {
+                    log.warn("Configure file does not contain nodes and does not specify custom fault, use noop fault");
+                    fault = new NoopFault();
+                }
             } else {
                 switch (arguments.fault) {
                     case "noop":
@@ -387,7 +387,7 @@ public class ChaosControl {
 
         ChaosControl.status = Status.RUN_ING;
         //Start fault worker
-        faultWorker = new FaultWorker(log, fault, arguments.interval);
+        faultWorker = new FaultWorker(log, fault, arguments.interval, arguments.fault_once);
 
         faultWorker.start();
 

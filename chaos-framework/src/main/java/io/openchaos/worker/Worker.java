@@ -20,10 +20,17 @@ public abstract class Worker extends Thread {
 
     protected Logger log;
     private volatile boolean breakFlag = false;
+    private boolean fault_once = false;
 
     public Worker(String name, Logger log) {
         super(name);
         this.log = log;
+    }
+
+    public Worker(String name, Logger log, boolean fault_once) {
+        super(name);
+        this.log = log;
+        this.fault_once = fault_once;
     }
 
     public abstract void loop() throws Exception;
@@ -41,6 +48,7 @@ public abstract class Worker extends Thread {
         while (!breakFlag) {
             try {
                 loop();
+                if(fault_once) break;
             } catch (InterruptedException e) {
                 if (log != null) {
                     log.info("{} break loop", getName());

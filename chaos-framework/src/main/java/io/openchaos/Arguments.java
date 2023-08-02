@@ -70,6 +70,10 @@ public class Arguments {
     public int interval = 30;
 
     @Parameter(names = {
+            "--fault-once"}, description = "Exec fault only once.")
+    public boolean fault_once = false;
+
+    @Parameter(names = {
         "-m",
         "--model"}, description = "Test model. Currently queue model and kv model are supported.")
     public String model = "queue";
